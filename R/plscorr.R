@@ -28,19 +28,39 @@ combinedAUC <- function(Pred, Obs) {
 }
 
 
-#' @export
+#' @title Extract Scores from PLS
+#' @description Extracts the scores from the PLS for the fit
+#' 
+#' @param x 
+#' @param ... additional arguments to pass to individual score functions
+#' @export 
 scores <- function(x,...) UseMethod("scores")
 
-#' @export
+#' @title Extract Loadings from PLS
+#' @description Extracts the loadings from the PLS for the fit
+#' 
+#' @param x 
+#' @param ... additional arguments to pass to individual loadings functions
+#' @export 
 loadings <- function(x,...) UseMethod("loadings")
 
-#' @export
+#' @title Cross-validate from PLS
+#' @description Performs cross-validation for the PLS fit
+#' 
+#' @param x 
+#' @param ... additional arguments to pass to individual cross_validate functions
+#' @export 
 cross_validate <- function(x, ...) UseMethod("cross_validate")
 
 #' @export
 nested_cv <- function(x, ...) UseMethod("nested_cv")
 
-#' @export
+#' @title Boostrap from PLS
+#' @description Performs bootstrapping for the PLS fit
+#' 
+#' @param x 
+#' @param ... additional arguments to pass to individual bootstrap functions
+#' @export 
 bootstrap <- function(x, niter, ...) UseMethod("bootstrap")
 
 #' @export
@@ -68,13 +88,28 @@ project.cols <- function(xc, v, ncomp) {
 #' @export
 reconstruct <- function(x, ncomp) UseMethod("reconstruct")
 
+#' @title Wrapper for different SVDs
+#' @description Allows the call of the SVD (Singular Value Decomposition) from
+#' different packages and implementations
+#' @param XC Matrix to perform SVD on
+#' @param ncomp Number of components to return
+#' @param method Method to use for SVD
+#' 
+#' @seealso \code{\link{fast.svd}}, \code{\link{irlba}}, \code{\link{svd}}
 #' @export
-svd.wrapper <- function(XC, ncomp=min(dim(XC)), method=c("base", "fast", "irlba")) {
+#' @importFrom corpcor fast.svd
+#' @importFrom irlba irlba
+svd.wrapper <- function(XC, 
+                        ncomp=min(dim(XC)), 
+                        method=c("base", "fast", "irlba"),) {
   assert_that(method %in% c("base", "fast", "irlba"))
+  method = match.arg(method)
   res <- switch(method[1],
-                base=svd(XC),
-                fast=corpcor:::fast.svd(XC),
-                irlba=irlba:::irlba(XC, nu=min(ncomp, min(dim(XC)) -3), nv=min(ncomp, min(dim(XC)) -3)))
+                base = svd(XC),
+                fast = corpcor::fast.svd(XC),
+                irlba = irlba::irlba(XC, 
+                                   nu=min(ncomp, min(dim(XC)) -3), 
+                                   nv=min(ncomp, min(dim(XC)) -3)))
   
  
   res$d <- res$d[1:length(res$d)]
@@ -84,6 +119,12 @@ svd.wrapper <- function(XC, ncomp=min(dim(XC)), method=c("base", "fast", "irlba"
   res
 }
 
+#' @title Calculate means 
+#' @description Calculate group means quickly for a data set over the 
+#' outcome variable Y
+#' @param Y Grouping variable to take means
+#' @param X matrix, data.frame or vector of data
+#'
 #' @export
 group_means <- function(Y, X) {
   Rs <- rowsum(X,Y)
@@ -93,6 +134,17 @@ group_means <- function(Y, X) {
   ret
 }
 
+#' @title Partial least squares 
+#' @description Implements partial least squares for a matrix of values and 
+#' an outcome Y.
+#' 
+#' @param Y Factor of values that are the outcome
+#' @param X matrix of values to perform SVD
+#' @param ncomp number of components in PLS
+#' @param center Should X be centered?
+#' @param scale Should X be scaled?
+#' @param svd.method Method to use to perform the SVD
+#'
 #' @export
 plscorr <- function(Y, X, ncomp=2, center=TRUE, scale=FALSE, svd.method="fast.svd") {
   if (is.factor(Y)) {
@@ -103,12 +155,14 @@ plscorr <- function(Y, X, ncomp=2, center=TRUE, scale=FALSE, svd.method="fast.sv
 }
 
 #' @export
+#' @rdname scores
 scores.pls_result_da <- function(x) {
   x$scores
 }
 
 
 #' @export
+#' @rdname nested_cv
 nested_cv.plscorr_result_da <- function(x, innerFolds, heldout, metric="AUC", min.comp=1) {
   res <- lapply(innerFolds, function(fidx) {
     exclude <- sort(c(fidx,heldout))
@@ -155,11 +209,13 @@ nested_cv.plscorr_result_contrast <- function(x, innerFolds, heldout, metric="AU
 
 
 #' @export
+#' @rdname reconstruct
 reconstruct.plscorr_result <- function(x, ncomp=x$ncomp) {
   t(x$u[,1:ncomp,drop=FALSE] %*% t(x$scores[,1:ncomp,drop=FALSE]))
 }
 
 #' @export
+#' @rdname reproducibility
 reproducibility.pls_result_da <- function(x, folds, metric=c("norm-2", "norm-1", "avg_cor")) {
   if (length(folds) == 1) {
     folds <- caret::createFolds(1:length(x$Y), folds)
@@ -197,6 +253,8 @@ stratified_folds <- function(strata, nfolds=2) {
   lapply(bfolds, function(f) unlist(blocks[f]))
 }
 
+#' @export
+#' @rdname cross_validate
 cross_validate.plscorr_result_contrast <- function(x, nfolds=2, nrepeats=10, metric=c("ACC", "distance"), nested=FALSE, max.comp=2) {
   
   M <- list()
@@ -229,6 +287,7 @@ cross_validate.plscorr_result_contrast <- function(x, nfolds=2, nrepeats=10, met
 }
 
 #' @export
+#' @rdname cross_validate
 cross_validate.plscorr_result_da <- function(x, folds, metric="AUC") {
   if (length(folds) == 1) {
     folds <- caret::createFolds(1:length(x$Y), folds)
@@ -285,6 +344,7 @@ scorepred <- function(fscores, scores, type=c("class", "prob", "scores", "crossp
 }
 
 #' @export
+#' @rdname predict_pls
 predict.plscorr_result_da <- function(x, newdata, type=c("class", "prob", "scores", "crossprod", "distance"), ncomp=NULL, pre_process=TRUE) {
   if (is.vector(newdata) && (length(newdata) == ncol(x$condMeans))) {
     x <- matrix(newdata, nrow=1, ncol=ncol(x$condMeans))
@@ -411,13 +471,18 @@ plscorr_lm <- function(X, formula, design, random=NULL, ncomp=2, center=TRUE, sc
 
 
 #' @export
+#' @title Partial Least Squares Analysis of Variance
+#' @description Performs an AOV with PLS 
 #' @param X the data matrix
 #' @param formula a formula specifying the design
 #' @param design a \code{data.frame} providing the variables provided in \code{formula} argument.
 #' @param random a \code{character} string indicating the name of the random effects variable
 #' @param ncomp of components to compute
-#' @param 
-plscorr_aov <- function(X, formula, design, random=NULL, ncomp=2, center=TRUE, scale=TRUE, svd.method="base") {
+#' @param center should X be centered?
+#' @param scale should X be scaled? 
+#' @param svd.method Method for performing SVD
+plscorr_aov <- function(X, formula, design, random=NULL, ncomp=2, center=TRUE, 
+                        scale=TRUE, svd.method="base") {
   tform <- terms(formula)
   facs <- attr(tform, "factors")
   
@@ -494,7 +559,7 @@ plscorr_aov <- function(X, formula, design, random=NULL, ncomp=2, center=TRUE, s
 
 # 
 #' @export
-#' @import turner
+#' @importFrom turner matrix_to_blocks
 plscorr_behav <- function(Y, X, group=NULL, random=NULL, ncomp=2, svd.method="base") {
     if (is.vector(Y)) {
       Y <- as.matrix(Y)
@@ -607,6 +672,14 @@ plscorr_contrast <- function(X, G, strata=NULL, ncomp=2, center=TRUE, scale=FALS
 }
 
 
+#' @title Partial Least Squares 
+#' @param Y 
+#' @param X 
+#' @param ncomp 
+#' @param center 
+#' @param scale 
+#' @param svd.method 
+#'
 #' @export
 plscorr_da <- function(Y, X, ncomp=2, center=TRUE, scale=FALSE, svd.method="base") {
   assert_that(is.factor(Y))

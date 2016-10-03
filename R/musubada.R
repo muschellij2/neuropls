@@ -22,12 +22,22 @@ coefficientRV <- function(X, Y) {
 
 
 
-#' @importFrom assertthat assert_that 
 ### implement soft-thresholding that spans datasets...? similar to spls?
+#'
+#' @param Y Outcome variable, given as a factor
+#' @param Xlist List of matrices 
+#' @param ncomp number of components for PLS
+#' @param center should each X be centered?
+#' @param scale should each X be scaled?
+#' @param svd.method method for SVD. See \code{\link{svd.wrapper}}.
+#' @param normalization Normalization method to be performed.
+#'
 #' @importFrom assertthat assert_that 
 #' @export
-musubada <- function(Y, Xlist, ncomp=2, center=TRUE, scale=FALSE, svd.method="fast.svd", normalization=c("MFA", "RV", "None")) {
-  normalization <- normalization[1]
+musubada <- function(Y, Xlist, ncomp=2, center=TRUE, scale=FALSE, svd.method="fast.svd", 
+                     normalization=c("MFA", "RV", "None")) {
+  normalization <- match.arg(normalization)
+  stopifnot(is.list(Xlist))
   
   assert_that(all(sapply(Xlist, is.matrix)))
   #assert_that(all(sapply(Xlist, nrow) == nrow(Xlist[[1]])))
